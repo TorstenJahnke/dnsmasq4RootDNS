@@ -1,0 +1,169 @@
+CHANGELOG — dnsmasq 2.92 (RootDNS Fork Edition)
+=================================================
+
+Based on dnsmasq 2.92 by Simon Kelley.
+
+
+Version 2.92-RootDNS (2026-02-17)
+----------------------------------
+
+  NEW FEATURES
+
+    * Iterative (recursive) DNS resolution from root servers
+      New module src/recursive.c implements the iterative resolution
+      algorithm per RFC 1034 Section 5.3.3.  Instead of forwarding
+      queries to an upstream resolver, dnsmasq now follows the
+      delegation chain: root → TLD → authoritative, just like BIND
+      or Unbound.
+
+    * --forward-rootDNS
+      Main switch to enable iterative resolution.  Loads the 13 IANA
+      root server addresses (A–M, IPv4 + IPv6), clears the RD bit on
+      outgoing queries, follows NS referrals, and sets RA on client
+      responses.  Referral chain depth limited to 20 iterations.
+
+    * --with-root-hints=<path>
+      Load root server addresses from a standard named.root file
+      (InterNIC format) instead of the built-in defaults.
+
+    * --with-root-zone=<path>
+      Pre-load the entire root zone into the delegation cache at
+      startup.  Parses ~1500 TLD delegations so that DNS lookups
+      skip the root servers entirely and start at the TLD nameservers.
+
+    * --with-root-priming
+      Send a priming query (NS .) at startup to verify root server
+      connectivity (RFC 8109).  Enabled by default with --forward-rootDNS.
+
+    * --wipe-dnssec
+      Strip all DNSSEC records (DS, RRSIG, NSEC, DNSKEY, NSEC3,
+      NSEC3PARAM) from responses and clear the AD bit.  Adds
+      RRFILTER_WIPE_DNSSEC mode to src/rrfilter.c.
+
+    * Delegation cache (--deleg-cache-size=<entries>)
+      New hash-based cache for NS delegation mappings.  Stores which
+      nameservers are authoritative for which zones, so repeated
+      queries for the same TLD/domain skip root and TLD lookups.
+      Default: 4096 buckets.  Each entry holds up to 13 NS addresses.
+
+    * --cname-flattening
+      Flatten CNAME chains in recursive responses.  Instead of returning
+      the full chain (alias → intermediate → … → target A 1.2.3.4),
+      the client receives only the final A/AAAA records rewritten under
+      the original query name.  The CNAME chain is hidden entirely.
+
+    * --cname-minimization
+      Minimize CNAME chains in recursive responses.  Multi-hop chains
+      are collapsed to a single CNAME from the original query name
+      directly to the final target, followed by the answer records.
+      Intermediate hops are stripped.  Mutually exclusive with
+      --cname-flattening (flattening takes precedence if both are set).
+
+    * CNAME chasing in recursive resolver
+      The iterative resolver now follows CNAME chains (limit: 15)
+      across zone boundaries, builds combined responses, decompresses
+      RDATA with compressed DNS names, and supports all record types.
+
+    * Out-of-bailiwick NS resolution
+      Synchronous resolution of NS records that lack glue (additional
+      section A/AAAA records), using a dedicated sub-resolver.
+
+    * --iterative-async=<N>
+      Asynchronous NS resolution for out-of-bailiwick nameserver names.
+      When the iterative resolver encounters NS hostnames without glue
+      records, a sub-query is dispatched asynchronously so the event loop
+      continues serving other clients.  Default: 2 (auto-enabled with
+      --forward-rootDNS).  Set to 0 for synchronous-only behavior.
+      Maximum: 10.  Falls back to synchronous resolution when the
+      concurrency limit is reached or the async path fails.
+
+    * DNSSEC validation for iterative path
+      Full chain-of-trust validation integrated into the iterative
+      resolution path.  Signed domains get the AD flag, bogus
+      signatures return SERVFAIL.
+
+  PERFORMANCE
+
+    * TTL from referral NS records
+      The delegation cache now honors the TTL from NS referral responses
+      instead of using a fixed default.  parse_referral() extracts the
+      minimum NS TTL from the Authority section and passes it to
+      deleg_cache_store().  Popular delegations stay cached longer,
+      stale entries expire naturally.
+
+    * CNAME Additional Section shortcut
+      When following CNAME chains, if the referral response already
+      contains matching A/AAAA records in the Additional section for
+      the CNAME target, those records are used directly.  This avoids
+      an unnecessary delegation chase for common CDN patterns where
+      the authoritative server provides the answer alongside the CNAME.
+
+    * Reduced sync resolver timeout
+      The synchronous NS resolver poll timeout was reduced from 2000ms
+      to 250ms.  Combined with the async NS resolution, this ensures
+      the event loop remains responsive even when falling back to
+      synchronous resolution.
+
+  BUILD SYSTEM
+
+    * make debian / make debian-hardened / make debian-native
+      Debian/Ubuntu build targets with all features enabled (DNSSEC,
+      DBus, IDN2, conntrack, nftset, Lua).
+
+    * make freebsd / make freebsd-hardened
+      FreeBSD build targets with all features enabled (DNSSEC, DBus,
+      IDN2, Lua).
+
+    * Hardened build variants
+      -hardened targets enable FORTIFY_SOURCE=2, stack protector
+      strong, PIE, full RELRO, and link-time optimisation (-flto=auto).
+
+    * make help
+      New target listing all available build targets and hardening
+      flags with descriptions.
+
+    * Version string branded as "(RootDNS Fork Edition)".
+
+  BUG FIXES
+
+    * Fix root server registration and NULL dereference crash on startup.
+    * Fix memset bug in delegation cache initialization.
+    * Fix recursive resolution: responses silently dropped when
+      delegation cache had a hit but referral was not properly followed.
+    * Fix bailiwick check: use parent zone instead of delegated zone
+      to prevent accepting out-of-bailiwick glue records.
+    * Fix bailiwick check for TLD delegations from root servers
+      (e.g. "." delegating to "com" was incorrectly rejected).
+    * Fix sync resolver buffer size check and stale prev_zone state
+      between consecutive queries.
+    * Fix CNAME chasing: build combined response manually instead of
+      re-entering answer_request() which caused truncation.
+    * Suppress cache-size >10000 warning when --forward-rootDNS is
+      active (larger caches are expected for iterative resolution).
+    * Fix root priming: OPT_ROOT_PRIMING flag was never checked —
+      now properly gates recursive_prime_root() call.
+    * Fix root priming: server filter searched for SERV_USE_RESOLV
+      but root hints have flags=0 — corrected to match servers with
+      domain_len==0.
+    * Fix root priming: was IPv4-only — now supports both IPv4 and
+      IPv6 by using the server's actual address family.
+    * Fix misleading comment that claimed priming response was cached —
+      corrected to describe actual connectivity-check behavior.
+    * Fix CNAME chase: aborted on cold delegation cache instead of
+      falling back to root servers — now builds referral list from
+      root hint servers when no delegation is cached.
+
+  SECURITY
+
+    * Comprehensive security audit (82 findings) with all CRITICAL,
+      HIGH, MEDIUM, and LOW severity issues fixed across three
+      batches (K1–K5, H1–H19, M1–M30, N1–N28).  Covers buffer
+      overflows, integer overflows, use-after-free, NULL pointer
+      dereferences, and input validation hardening.
+
+  REFERENCES
+
+    RFC 1034  — Domain Names: Concepts and Facilities (Section 5.3.3)
+    RFC 4033  — DNS Security Introduction and Requirements (DNSSEC)
+    RFC 4035  — Protocol Modifications for DNSSEC
+    RFC 8109  — Initializing a DNS Resolver with Priming Queries
