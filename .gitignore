@@ -1,0 +1,8 @@
+# Build crap
+src/*.o
+src/dnsmasq
+src/.copts_*
+*.mo
+*.pot
+# MacOS
+.DS_Store
