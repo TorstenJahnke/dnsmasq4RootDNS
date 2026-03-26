@@ -1245,9 +1245,19 @@ struct referral_server *resolve_ns_name_sync(const char *ns_name)
           pfd.events = POLLIN;
           if (poll(&pfd, 1, 250) > 0 && (pfd.revents & POLLIN))
             {
-              n = recv(fd, resp_buf, sizeof(resp_buf), 0);
+              union mysockaddr from_addr;
+              socklen_t from_len = sizeof(from_addr);
+              n = recvfrom(fd, resp_buf, sizeof(resp_buf), 0,
+                           &from_addr.sa, &from_len);
               if (n >= (ssize_t)sizeof(struct dns_header))
-                got_response = 1;
+                {
+                  if (sockaddr_isequal(&from_addr, &rs->addr))
+                    {
+                      struct dns_header *rh = (struct dns_header *)resp_buf;
+                      if (rh->id == ((struct dns_header *)query_buf)->id)
+                        got_response = 1;
+                    }
+                }
             }
 
           close(fd);
@@ -1367,8 +1377,6 @@ int extract_cname_target(struct dns_header *header, size_t plen,
   unsigned long ttl;
   char current_name[MAXDNAME];
 
-  (void)target_len;
-
   if (!(p = skip_questions(header, plen)))
     return 0;
 
@@ -1404,7 +1412,7 @@ int extract_cname_target(struct dns_header *header, size_t plen,
     }
 
   if (found)
-    safe_strncpy(target, current_name, MAXDNAME);
+    safe_strncpy(target, current_name, target_len);
 
   return found;
 }
