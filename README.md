@@ -1,3 +1,20 @@
+# ⚠️ This Repository is Archived
+
+> **This repository is read-only and no longer maintained.**
+>
+> Development has moved to a new location:
+>
+> ## 👉 [github.com/TorstenJahnke/dnsmasq-Root-DNS-Edition](https://github.com/TorstenJahnke/dnsmasq-Root-DNS-Edition)
+>
+> Please open issues, submit pull requests, and follow updates there.
+
+---
+
+<details>
+<summary>📄 Original README (historical reference)</summary>
+
+---
+
 # DNSMASQ RootDNS Edition
 
 **Iterative DNS Resolution from Root Servers — No Forwarders Required**
@@ -255,8 +272,6 @@ cache-size=50000
 deleg-cache-size=8192
 ```
 
-Resolves iteratively with full chain-of-trust validation. Signed domains get the AD flag, bogus signatures return SERVFAIL.
-
 ### Maximum Performance (no DNSSEC)
 
 ```ini
@@ -284,8 +299,6 @@ cache-size=50000
 deleg-cache-size=8192
 ```
 
-Clients see direct A/AAAA answers without any CNAME indirection. Useful for CDN-heavy environments where CNAME chains add unnecessary response size.
-
 ### With Custom Root Hints
 
 ```ini
@@ -297,8 +310,6 @@ cache-size=50000
 ---
 
 ## Updating the Root Zone
-
-The root zone should be updated periodically (e.g. weekly via cron):
 
 ```bash
 curl -o /etc/dnsmasq/root.zone https://www.internic.net/domain/root.zone
@@ -349,6 +360,8 @@ Binary output: `src/dnsmasq`
 - [InterNIC Root Zone](https://www.internic.net/domain/root.zone)
 - [dnsmasq](http://www.thekelleys.org.uk/dnsmasq/doc.html) — Original project by Simon Kelley
 
+---
+
 ## License
 
 Based on [dnsmasq](http://www.thekelleys.org.uk/dnsmasq/doc.html) by Simon Kelley.
@@ -360,3 +373,5 @@ Licensed under the GNU General Public License v2 (or, at your option, v3).
 See COPYING for details.
 
 **THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.**
+
+</details>
